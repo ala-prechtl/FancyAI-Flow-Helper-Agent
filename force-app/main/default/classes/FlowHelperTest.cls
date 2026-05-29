@@ -17,8 +17,8 @@ private class FlowHelperTest {
     for (Object flowObj : flows) {
       Map<String, Object> flow = (Map<String, Object>) flowObj;
       if ((String) flow.get('name') == 'Account Creation') {
-          foundAccountCreation = true;
-          break;
+        foundAccountCreation = true;
+        break;
       }
     }
 
