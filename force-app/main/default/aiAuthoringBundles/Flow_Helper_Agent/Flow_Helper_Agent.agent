@@ -57,6 +57,7 @@ subagent flow_search:
 
         actions:
             search_flows: @actions.search_flows
+                with action = "search"
                 with searchKeyword = ...
                 with flowType = ...
 
@@ -119,6 +120,7 @@ subagent flow_details:
 
         actions:
             get_details: @actions.get_flow_details
+                with action = "details"
                 with flowName = ...
 
     actions:
@@ -184,6 +186,7 @@ subagent list_flows:
 
         actions:
             list_types: @actions.list_flow_types
+                with action = "list-types"
 
     actions:
         list_flow_types:
