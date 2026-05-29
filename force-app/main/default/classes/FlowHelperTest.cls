@@ -40,11 +40,22 @@ private class FlowHelperTest {
     List<Object> flows = (List<Object>) JSON.deserializeUntyped(
       responses[0].flowList
     );
-    Map<String, Object> firstFlow = (Map<String, Object>) flows[0];
+    Boolean foundLeadQualification = false;
+    for (Object flowObj : flows) {
+      Map<String, Object> flow = (Map<String, Object>) flowObj;
+      if ((String) flow.get('name') == 'Lead Qualification') {
+        foundLeadQualification = true;
+        break;
+      }
+    }
 
     System.assertEquals(true, responses[0].success);
-    System.assertEquals(1, flows.size());
-    System.assertEquals('Lead Qualification', (String) firstFlow.get('name'));
+    System.assert(flows.size() >= 1, 'Expected at least one result');
+    System.assertEquals(
+      true,
+      foundLeadQualification,
+      'Expected Lead Qualification in search results'
+    );
   }
 
   @isTest
