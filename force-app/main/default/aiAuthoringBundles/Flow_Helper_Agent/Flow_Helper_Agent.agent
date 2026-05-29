@@ -1,0 +1,216 @@
+system:
+    instructions: "You are a helpful Salesforce Flow expert assistant. Your role is to help users find the right flows, understand what flows do, and provide guidance on flow-related questions. You have access to search flows by keyword, get detailed information about specific flows, and list available flow types."
+    messages:
+        welcome: "Hi! I'm your Salesforce Flow Helper Agent. I can help you find flows, explain what they do, and answer questions about flows in your org. What would you like to know?"
+        error: "Sorry, something went wrong. Please try rephrasing your question or contact your administrator."
+
+config:
+    developer_name: "Flow_Helper_Agent"
+    agent_label: "Flow Helper Agent"
+    description: "An AI agent that helps you navigate, find, and understand Salesforce flows in your org."
+    default_agent_user: "UPDATE_WITH_YOUR_DEFAULT_AGENT_USER"
+
+variables:
+    search_keyword: mutable string = ""
+        description: "The keyword for flow search"
+    current_flow_name: mutable string = ""
+        description: "The name of the flow currently being discussed"
+
+language:
+    default_locale: "en_US"
+    additional_locales: ""
+    all_additional_locales: False
+
+start_agent flow_router:
+    label: "Flow Router"
+    description: "Route user requests to the appropriate flow helper subagent"
+    
+    reasoning:
+        instructions: ->
+            | Analyze the user's request and route them to the appropriate subagent:
+              - If they want to SEARCH or FIND flows by keyword or type, go to flow_search
+              - If they want DETAILS about a specific flow, go to flow_details
+              - If they ask about available FLOW TYPES, go to list_flows
+              - Otherwise, provide helpful information about your capabilities
+
+        actions:
+            go_search: @utils.transition to @subagent.flow_search
+            go_details: @utils.transition to @subagent.flow_details
+            go_types: @utils.transition to @subagent.list_flows
+
+subagent flow_search:
+    label: "Flow Search"
+    description: "Search for flows by keyword or flow type"
+
+    reasoning:
+        instructions: ->
+            | Your job is to help users find flows in their Salesforce org.
+              When a user asks to find or search for flows, use the {!@actions.search_flows} action with their search criteria.
+              
+              Extract the search keyword from their question. If they mention a specific flow type (like "triggered flows", "scheduled flows", etc.), also include that.
+              
+              After getting results, summarize the flows in a clear, easy-to-read format:
+              - List each flow with its name, developer name, and description
+              - Organize results logically
+              - If many flows are found, suggest how they might narrow their search
+              - Offer to get more details about any specific flow
+
+        actions:
+            search_flows: @actions.search_flows
+                with searchKeyword = ...
+                with flowType = ...
+
+    actions:
+        search_flows:
+            description: "Search for flows by keyword or type"
+            label: "Search Flows"
+            target: "apex://FlowHelper"
+            include_in_progress_indicator: True
+            progress_indicator_message: "Searching for flows..."
+            inputs:
+                action: string
+                    description: "The action to perform"
+                    label: "Action"
+                    is_required: True
+                    complex_data_type_name: "lightning__textType"
+                searchKeyword: string
+                    description: "Keyword to search in flow name, description, or developer name"
+                    label: "Search Keyword"
+                    is_required: False
+                    complex_data_type_name: "lightning__textType"
+                flowType: string
+                    description: "Flow type to filter by (e.g., 'Trigger-Based', 'Scheduled')"
+                    label: "Flow Type"
+                    is_required: False
+                    complex_data_type_name: "lightning__textType"
+            outputs:
+                success: boolean
+                    label: "Success"
+                    description: "Whether the operation was successful"
+                    is_displayable: False
+                    filter_from_agent: False
+                message: string
+                    label: "Message"
+                    description: "Status message about the search"
+                    is_displayable: True
+                    filter_from_agent: False
+                flowList: string
+                    label: "Flow List"
+                    description: "JSON-serialized list of flows"
+                    is_displayable: False
+                    filter_from_agent: False
+
+subagent flow_details:
+    label: "Flow Details"
+    description: "Get detailed information about a specific flow"
+
+    reasoning:
+        instructions: ->
+            | Your job is to provide detailed information about specific flows.
+              When a user asks about a specific flow or wants to know what a flow does, use the {!@actions.get_flow_details} action.
+              
+              Extract the flow name from their question (they might provide the display name or developer name).
+              
+              After getting the details, present the information clearly:
+              - Flow name
+              - Description of what it does
+              - Flow type (Trigger-Based, Scheduled, Screen Flow, etc.)
+              - Offer to search for related flows or provide more help
+
+        actions:
+            get_details: @actions.get_flow_details
+                with flowName = ...
+
+    actions:
+        get_flow_details:
+            description: "Get detailed information about a specific flow"
+            label: "Get Flow Details"
+            target: "apex://FlowHelper"
+            include_in_progress_indicator: True
+            progress_indicator_message: "Retrieving flow details..."
+            inputs:
+                action: string
+                    description: "The action to perform"
+                    label: "Action"
+                    is_required: True
+                    complex_data_type_name: "lightning__textType"
+                flowName: string
+                    description: "The name or developer name of the flow"
+                    label: "Flow Name"
+                    is_required: True
+                    complex_data_type_name: "lightning__textType"
+            outputs:
+                success: boolean
+                    label: "Success"
+                    description: "Whether the operation was successful"
+                    is_displayable: False
+                    filter_from_agent: False
+                message: string
+                    label: "Message"
+                    description: "Status message"
+                    is_displayable: True
+                    filter_from_agent: False
+                flowName: string
+                    label: "Flow Name"
+                    description: "The flow display name"
+                    is_displayable: True
+                    filter_from_agent: False
+                flowDescription: string
+                    label: "Description"
+                    description: "Description of what the flow does"
+                    is_displayable: True
+                    filter_from_agent: False
+                flowType: string
+                    label: "Flow Type"
+                    description: "Type of flow"
+                    is_displayable: True
+                    filter_from_agent: False
+
+subagent list_flows:
+    label: "List Available Flows"
+    description: "List all available flow types in the org"
+
+    reasoning:
+        instructions: ->
+            | Your job is to show users what flow types are available in their org.
+              When asked about flow types or what kinds of flows exist, use the {!@actions.list_flow_types} action.
+              
+              Present the flow types clearly and explain briefly what each type is used for:
+              - "Trigger-Based": Flows that run automatically when specific events occur
+              - "Scheduled": Flows that run on a schedule
+              - "Screen Flow": Interactive flows that guide users through steps
+              
+              After showing the types, offer to search for flows of a specific type.
+
+        actions:
+            list_types: @actions.list_flow_types
+
+    actions:
+        list_flow_types:
+            description: "List all available flow types in the org"
+            label: "List Flow Types"
+            target: "apex://FlowHelper"
+            include_in_progress_indicator: True
+            progress_indicator_message: "Fetching available flow types..."
+            inputs:
+                action: string
+                    description: "The action to perform"
+                    label: "Action"
+                    is_required: True
+                    complex_data_type_name: "lightning__textType"
+            outputs:
+                success: boolean
+                    label: "Success"
+                    description: "Whether the operation was successful"
+                    is_displayable: False
+                    filter_from_agent: False
+                message: string
+                    label: "Message"
+                    description: "Status message"
+                    is_displayable: True
+                    filter_from_agent: False
+                flowList: string
+                    label: "Flow Types"
+                    description: "JSON-serialized list of available flow types"
+                    is_displayable: False
+                    filter_from_agent: False
