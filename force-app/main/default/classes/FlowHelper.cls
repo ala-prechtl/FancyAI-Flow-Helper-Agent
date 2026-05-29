@@ -1,4 +1,10 @@
 public with sharing class FlowHelper {
+    private static final Integer SHORT_TOKEN_LENGTH = 4;
+    private static final Integer MEDIUM_TOKEN_LENGTH = 8;
+    private static final Integer SHORT_TOKEN_THRESHOLD = 1;
+    private static final Integer MEDIUM_TOKEN_THRESHOLD = 2;
+    private static final Integer LONG_TOKEN_THRESHOLD = 3;
+
     @InvocableMethod(
         label='Get Flow Information'
         description='Get information about flows - search, details, or list types'
@@ -45,9 +51,9 @@ public with sharing class FlowHelper {
         
         for (Map<String, String> flow : flows) {
             Boolean matchesKeyword = String.isBlank(keyword) || 
-                flow.get('name').containsIgnoreCase(keyword) ||
-                flow.get('developer_name').containsIgnoreCase(keyword) ||
-                flow.get('description').containsIgnoreCase(keyword);
+                isFuzzyMatch(keyword, flow.get('name')) ||
+                isFuzzyMatch(keyword, flow.get('developer_name')) ||
+                isFuzzyMatch(keyword, flow.get('description'));
             
             Boolean matchesType = String.isBlank(flowType) || 
                 flow.get('flow_type').equalsIgnoreCase(flowType);
@@ -64,6 +70,96 @@ public with sharing class FlowHelper {
             response.flowList = JSON.serialize(results);
         }
         response.success = true;
+    }
+
+    private static Boolean isFuzzyMatch(String keyword, String valueToSearch) {
+        if (String.isBlank(valueToSearch)) {
+            return false;
+        }
+
+        String normalizedKeyword = normalizeForFuzzy(keyword);
+        String normalizedValue = normalizeForFuzzy(valueToSearch);
+
+        if (normalizedValue.contains(normalizedKeyword)) {
+            return true;
+        }
+
+        List<String> keywordTokens = normalizedKeyword.split('\\s+');
+        List<String> valueTokens = normalizedValue.split('\\s+');
+
+        for (String keywordToken : keywordTokens) {
+            if (String.isBlank(keywordToken)) {
+                continue;
+            }
+
+            Boolean tokenMatched = false;
+            for (String valueToken : valueTokens) {
+                Integer threshold = getFuzzyThreshold(keywordToken, valueToken);
+                if (
+                    valueToken.contains(keywordToken) ||
+                    keywordToken.contains(valueToken) ||
+                    getLevenshteinDistance(keywordToken, valueToken, threshold) <= threshold
+                ) {
+                    tokenMatched = true;
+                    break;
+                }
+            }
+
+            if (!tokenMatched) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static String normalizeForFuzzy(String input) {
+        String normalized = input == null ? '' : input.toLowerCase();
+        normalized = normalized.replace('_', ' ').replace('-', ' ');
+        normalized = normalized.replaceAll('[^a-z0-9 ]', ' ');
+        normalized = normalized.replaceAll('\\s+', ' ').trim();
+        return normalized;
+    }
+
+    private static Integer getFuzzyThreshold(String source, String target) {
+        Integer minLength = Math.min(source.length(), target.length());
+        if (minLength <= SHORT_TOKEN_LENGTH) {
+            return SHORT_TOKEN_THRESHOLD;
+        }
+        if (minLength <= MEDIUM_TOKEN_LENGTH) {
+            return MEDIUM_TOKEN_THRESHOLD;
+        }
+        return LONG_TOKEN_THRESHOLD;
+    }
+
+    private static Integer getLevenshteinDistance(String source, String target, Integer maxDistance) {
+        Integer sourceLength = source.length();
+        Integer targetLength = target.length();
+
+        List<Integer> previousRow = new List<Integer>();
+        for (Integer i = 0; i <= targetLength; i++) {
+            previousRow.add(i);
+        }
+
+        for (Integer i = 1; i <= sourceLength; i++) {
+            List<Integer> currentRow = new List<Integer>{ i };
+            Integer rowMinimum = i;
+            for (Integer j = 1; j <= targetLength; j++) {
+                Integer substitutionCost = source.substring(i - 1, i) == target.substring(j - 1, j) ? 0 : 1;
+                Integer insertion = currentRow.get(j - 1) + 1;
+                Integer deletion = previousRow.get(j) + 1;
+                Integer substitution = previousRow.get(j - 1) + substitutionCost;
+                Integer distance = Math.min(insertion, Math.min(deletion, substitution));
+                currentRow.add(distance);
+                rowMinimum = Math.min(rowMinimum, distance);
+            }
+            if (rowMinimum > maxDistance) {
+                return maxDistance + 1;
+            }
+            previousRow = currentRow;
+        }
+
+        return previousRow.get(targetLength);
     }
     
     private static void handleGetFlowDetails(FlowHelperRequest request, FlowHelperResponse response) {
