@@ -1,4 +1,10 @@
 public with sharing class FlowHelper {
+    private static final Integer SHORT_TOKEN_LENGTH = 4;
+    private static final Integer MEDIUM_TOKEN_LENGTH = 8;
+    private static final Integer SHORT_TOKEN_THRESHOLD = 1;
+    private static final Integer MEDIUM_TOKEN_THRESHOLD = 2;
+    private static final Integer LONG_TOKEN_THRESHOLD = 3;
+
     @InvocableMethod(
         label='Get Flow Information'
         description='Get information about flows - search, details, or list types'
@@ -88,10 +94,11 @@ public with sharing class FlowHelper {
 
             Boolean tokenMatched = false;
             for (String valueToken : valueTokens) {
+                Integer threshold = getFuzzyThreshold(keywordToken, valueToken);
                 if (
                     valueToken.contains(keywordToken) ||
                     keywordToken.contains(valueToken) ||
-                    getLevenshteinDistance(keywordToken, valueToken) <= getFuzzyThreshold(keywordToken, valueToken)
+                    getLevenshteinDistance(keywordToken, valueToken, threshold) <= threshold
                 ) {
                     tokenMatched = true;
                     break;
@@ -116,16 +123,16 @@ public with sharing class FlowHelper {
 
     private static Integer getFuzzyThreshold(String source, String target) {
         Integer minLength = Math.min(source.length(), target.length());
-        if (minLength <= 4) {
-            return 1;
+        if (minLength <= SHORT_TOKEN_LENGTH) {
+            return SHORT_TOKEN_THRESHOLD;
         }
-        if (minLength <= 8) {
-            return 2;
+        if (minLength <= MEDIUM_TOKEN_LENGTH) {
+            return MEDIUM_TOKEN_THRESHOLD;
         }
-        return 3;
+        return LONG_TOKEN_THRESHOLD;
     }
 
-    private static Integer getLevenshteinDistance(String source, String target) {
+    private static Integer getLevenshteinDistance(String source, String target, Integer maxDistance) {
         Integer sourceLength = source.length();
         Integer targetLength = target.length();
 
@@ -136,12 +143,18 @@ public with sharing class FlowHelper {
 
         for (Integer i = 1; i <= sourceLength; i++) {
             List<Integer> currentRow = new List<Integer>{ i };
+            Integer rowMinimum = i;
             for (Integer j = 1; j <= targetLength; j++) {
                 Integer substitutionCost = source.substring(i - 1, i) == target.substring(j - 1, j) ? 0 : 1;
                 Integer insertion = currentRow.get(j - 1) + 1;
                 Integer deletion = previousRow.get(j) + 1;
                 Integer substitution = previousRow.get(j - 1) + substitutionCost;
-                currentRow.add(Math.min(insertion, Math.min(deletion, substitution)));
+                Integer distance = Math.min(insertion, Math.min(deletion, substitution));
+                currentRow.add(distance);
+                rowMinimum = Math.min(rowMinimum, distance);
+            }
+            if (rowMinimum > maxDistance) {
+                return maxDistance + 1;
             }
             previousRow = currentRow;
         }

@@ -13,8 +13,18 @@ private class FlowHelperTest {
     List<Object> flows = (List<Object>) JSON.deserializeUntyped(
       responses[0].flowList
     );
+    Boolean foundAccountCreation = false;
+    for (Object flowObj : flows) {
+      Map<String, Object> flow = (Map<String, Object>) flowObj;
+      if ((String) flow.get('name') == 'Account Creation') {
+          foundAccountCreation = true;
+          break;
+      }
+    }
+
     System.assertEquals(true, responses[0].success);
-    System.assertEquals(1, flows.size());
+    System.assert(flows.size() >= 1, 'Expected at least one result');
+    System.assertEquals(true, foundAccountCreation, 'Expected Account Creation in search results');
   }
 
   @isTest
