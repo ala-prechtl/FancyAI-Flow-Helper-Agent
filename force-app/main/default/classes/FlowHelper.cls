@@ -1,4 +1,7 @@
 public with sharing class FlowHelper {
+  private static final Integer SHORT_KEYWORD_MAX_DISTANCE = 1;
+  private static final Integer LONG_KEYWORD_MAX_DISTANCE = 2;
+
   @InvocableMethod(
     label='Get Flow Information'
     description='Get information about flows - search, details, or list types'
@@ -85,7 +88,9 @@ public with sharing class FlowHelper {
       return true;
     }
 
-    Integer maxDistance = normalizedKeyword.length() <= 4 ? 1 : 2;
+    Integer maxDistance = normalizedKeyword.length() <= 4
+      ? SHORT_KEYWORD_MAX_DISTANCE
+      : LONG_KEYWORD_MAX_DISTANCE;
     if (
       Math.abs(normalizedField.length() - normalizedKeyword.length()) <=
       maxDistance &&
