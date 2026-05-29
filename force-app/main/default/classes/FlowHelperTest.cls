@@ -1,7 +1,7 @@
 @isTest
 private class FlowHelperTest {
   @isTest
-  static void searchFlows_exactMatchWorks() {
+  static void searchFlows_partialKeywordMatchWorks() {
     FlowHelper.FlowHelperRequest request = new FlowHelper.FlowHelperRequest();
     request.action = 'search';
     request.searchKeyword = 'Account';
